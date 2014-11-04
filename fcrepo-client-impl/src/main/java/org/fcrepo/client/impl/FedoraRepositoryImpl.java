@@ -33,6 +33,7 @@ import static org.apache.http.HttpStatus.SC_OK;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
 import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpPut;
 import org.fcrepo.client.FedoraContent;
@@ -190,6 +191,41 @@ public class FedoraRepositoryImpl implements FedoraRepository {
             throw new FedoraException(e);
         } finally {
             put.releaseConnection();
+        }
+    }
+
+    @Override
+    public FedoraObject createObject(final String path, final boolean isIdAutogen) throws FedoraException {
+        HttpEntityEnclosingRequestBase req = null;
+        if (isIdAutogen) {
+            req = httpHelper.createPostMethod(path, null);
+        } else {
+            req = httpHelper.createPutMethod(path, null);
+        }
+        try {
+            final HttpResponse response = httpHelper.execute(req);
+            final String uri = req.getURI().toString();
+            final StatusLine status = response.getStatusLine();
+            final int statusCode = status.getStatusCode();
+
+            if (statusCode == SC_CREATED) {
+                return getObject(path);
+            } else if (statusCode == SC_FORBIDDEN) {
+                LOGGER.error("request to create resource {} is not authorized.", uri);
+                throw new ForbiddenException("request to create resource " + uri + " is not authorized.");
+            } else if (statusCode == SC_CONFLICT) {
+                LOGGER.error("resource {} already exists", uri);
+                throw new FedoraException("resource " + uri + " already exists");
+            } else {
+                LOGGER.error("error creating resource {}: {} {}", uri, statusCode, status.getReasonPhrase());
+                throw new FedoraException("error retrieving resource " + uri + ": " + statusCode + " " +
+                                                  status.getReasonPhrase());
+            }
+        } catch (final Exception e) {
+            LOGGER.error("could not encode URI parameter", e);
+            throw new FedoraException(e);
+        } finally {
+            req.releaseConnection();
         }
     }
 
