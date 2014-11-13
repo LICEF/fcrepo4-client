@@ -30,12 +30,15 @@ import static org.apache.http.HttpStatus.SC_FORBIDDEN;
 import static org.apache.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.http.HttpStatus.SC_OK;
 
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
 import org.apache.http.client.methods.HttpHead;
+//import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
+import org.apache.http.util.EntityUtils;
 import org.fcrepo.client.FedoraContent;
 import org.fcrepo.client.FedoraDatastream;
 import org.fcrepo.client.FedoraException;
@@ -136,7 +139,7 @@ public class FedoraRepositoryImpl implements FedoraRepository {
 
     @Override
     public FedoraDatastream createDatastream(final String path, final FedoraContent content) throws FedoraException {
-        final HttpPut put = httpHelper.createContentPutMethod(path, null, content);
+        final HttpPut put = httpHelper.createContentPutMethod(path + "/fcr:content", null, content);
         try {
             final HttpResponse response = httpHelper.execute(put);
             final String uri = put.getURI().toString();
@@ -196,36 +199,38 @@ public class FedoraRepositoryImpl implements FedoraRepository {
 
     @Override
     public FedoraObject createObject(final String path, final boolean isIdAutogen) throws FedoraException {
-        HttpEntityEnclosingRequestBase req = null;
         if (isIdAutogen) {
-            req = httpHelper.createPostMethod(path, null);
-        } else {
-            req = httpHelper.createPutMethod(path, null);
-        }
-        try {
-            final HttpResponse response = httpHelper.execute(req);
-            final String uri = req.getURI().toString();
-            final StatusLine status = response.getStatusLine();
-            final int statusCode = status.getStatusCode();
+            final HttpEntityEnclosingRequestBase req = httpHelper.createPostMethod(path, null);
+            try {
+                final HttpResponse response = httpHelper.execute(req);
+                final String uri = req.getURI().toString();
+                final HttpEntity entity = response.getEntity();
+                final String location = EntityUtils.toString(entity);
+                final StatusLine status = response.getStatusLine();
+                final int statusCode = status.getStatusCode();
 
-            if (statusCode == SC_CREATED) {
-                return getObject(path);
-            } else if (statusCode == SC_FORBIDDEN) {
-                LOGGER.error("request to create resource {} is not authorized.", uri);
-                throw new ForbiddenException("request to create resource " + uri + " is not authorized.");
-            } else if (statusCode == SC_CONFLICT) {
-                LOGGER.error("resource {} already exists", uri);
-                throw new FedoraException("resource " + uri + " already exists");
-            } else {
-                LOGGER.error("error creating resource {}: {} {}", uri, statusCode, status.getReasonPhrase());
-                throw new FedoraException("error retrieving resource " + uri + ": " + statusCode + " " +
-                                                  status.getReasonPhrase());
+                if (statusCode == SC_CREATED) {
+                    final String newPath = location.substring(location.indexOf( "rest" ) + 4);
+                    return getObject(newPath);
+                } else if (statusCode == SC_FORBIDDEN) {
+                    LOGGER.error("request to create resource {} is not authorized.", uri);
+                    throw new ForbiddenException("request to create resource " + uri + " is not authorized.");
+                } else if (statusCode == SC_CONFLICT) {
+                    LOGGER.error("resource {} already exists", uri);
+                    throw new FedoraException("resource " + uri + " already exists");
+                } else {
+                    LOGGER.error("error creating resource {}: {} {}", uri, statusCode, status.getReasonPhrase());
+                    throw new FedoraException("error retrieving resource " + uri + ": " + statusCode + " " +
+                                                      status.getReasonPhrase());
+                }
+            } catch (final Exception e) {
+                LOGGER.error("could not encode URI parameter", e);
+                throw new FedoraException(e);
+            } finally {
+                req.releaseConnection();
             }
-        } catch (final Exception e) {
-            LOGGER.error("could not encode URI parameter", e);
-            throw new FedoraException(e);
-        } finally {
-            req.releaseConnection();
+        } else {
+            return createObject(path);
         }
     }
 
