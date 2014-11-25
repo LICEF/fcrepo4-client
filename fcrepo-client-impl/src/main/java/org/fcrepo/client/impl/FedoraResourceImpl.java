@@ -104,13 +104,10 @@ public class FedoraResourceImpl implements FedoraResource {
 
     @Override
     public void delete() throws ReadOnlyException, FedoraException {
-        System.out.println("delete path=" + path);
         final HttpDelete delete = httpHelper.createDeleteMethod( path );
-        System.out.println( "deleteReq=" + delete);
         try {
             final HttpResponse response = httpHelper.execute( delete );
             final StatusLine status = response.getStatusLine();
-            System.out.println( "status=" + status );
             final String uri = delete.getURI().toString();
 
             if ( status.getStatusCode() == SC_NO_CONTENT) {
