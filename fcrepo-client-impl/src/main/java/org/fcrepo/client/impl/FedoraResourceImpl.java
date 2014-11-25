@@ -36,6 +36,7 @@ import org.apache.jena.atlas.lib.NotImplemented;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
+import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpPatch;
 import org.apache.http.client.methods.HttpPut;
 
@@ -102,9 +103,41 @@ public class FedoraResourceImpl implements FedoraResource {
     }
 
     @Override
-    public void delete() throws ReadOnlyException {
-        // TODO Auto-generated method stub
-        throw new NotImplemented("Method delete() is not implemented.");
+    public void delete() throws ReadOnlyException, FedoraException {
+        System.out.println("delete path=" + path);
+        final HttpDelete delete = httpHelper.createDeleteMethod( path );
+        System.out.println( "deleteReq=" + delete);
+        try {
+            final HttpResponse response = httpHelper.execute( delete );
+            final StatusLine status = response.getStatusLine();
+            System.out.println( "status=" + status );
+            final String uri = delete.getURI().toString();
+
+            if ( status.getStatusCode() == SC_NO_CONTENT) {
+                LOGGER.debug("resource {} deleted successfully", uri);
+            } else if ( status.getStatusCode() == SC_FORBIDDEN) {
+                LOGGER.error("request for resource {} is not authorized.", uri);
+                throw new ForbiddenException("request for resource " + uri + " is not authorized.");
+            } else if ( status.getStatusCode() == SC_NOT_FOUND) {
+                LOGGER.error("resource {} does not exist, cannot retrieve", uri);
+                throw new NotFoundException("resource " + uri + " does not exist, cannot retrieve");
+            } else if ( status.getStatusCode() == SC_CONFLICT) {
+                LOGGER.error("checksum mismatch for {}", uri);
+                throw new FedoraException("checksum mismatch for resource " + uri);
+            } else {
+                LOGGER.error("error retrieving resource {}: {} {}", uri, status.getStatusCode(),
+                             status.getReasonPhrase());
+                throw new FedoraException("error retrieving resource " + uri + ": " + status.getStatusCode() + " " +
+                                          status.getReasonPhrase());
+            }
+        } catch (final FedoraException e) {
+            throw e;
+        } catch (final Exception e) {
+            LOGGER.error("could not encode URI parameter", e);
+            throw new FedoraException(e);
+        } finally {
+            delete.releaseConnection();
+        }
     }
 
     @Override

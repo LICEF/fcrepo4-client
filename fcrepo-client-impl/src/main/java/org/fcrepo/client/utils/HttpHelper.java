@@ -51,6 +51,7 @@ import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpPatch;
@@ -232,6 +233,15 @@ public class HttpHelper {
     **/
     public HttpPut createPutMethod(final String path, final Map<String, List<String>> params) {
         return new HttpPut(repositoryURL + path + queryString(params));
+    }
+
+    /**
+     * Create DELETE method with list of parameters
+     * @param path Resource path, relative to repository baseURL
+     * @return DELETE method
+    **/
+    public HttpDelete createDeleteMethod(final String path) {
+        return new HttpDelete(repositoryURL + path);
     }
 
     /**
